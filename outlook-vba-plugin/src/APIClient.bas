@@ -3,13 +3,21 @@
 ' ========================================
 '
 ' Description: Module pour communiquer avec l'API Node.js sur localhost:3000
-' Fonctions: HTTP POST, TÃ©lÃ©chargement de fichiers, Gestion d'erreurs
+' Fonctions: HTTP POST, TÃƒÂ©lÃƒÂ©chargement de fichiers, Gestion d'erreurs
 '
 ' ========================================
 
 Option Explicit
 
 ' Constantes pour l'API
+' Ajouter aprÃ¨s la ligne 12 (Option Explicit)
+
+' POUR LOCAL (dÃ©veloppement) :
+'Private Const API_BASE_URL As String = "http://localhost:3000"
+
+' POUR RENDER (production) :
+Private Const API_BASE_URL As String = "https://pdf-signature-api-60nw.onrender.com"
+
 Private Const API_ENDPOINT As String = "/api/process-pdfs-from-outlook"
 Private Const DOWNLOAD_ENDPOINT As String = "/download-signed/"
 Private Const TIMEOUT_SECONDS As Long = 120
@@ -19,6 +27,10 @@ Private Const TIMEOUT_SECONDS As Long = 120
 ' ========================================
 Public Function CallSignatureAPI(pdfFiles As Collection) As Collection
     On Error GoTo ErrorHandler
+    
+    Debug.Print "=== DÃ‰BUT CallSignatureAPI ==="
+    Debug.Print "Nombre de PDFs Ã  traiter: " & pdfFiles.count
+    Debug.Print "Heure dÃ©but API: " & Now
 
     Dim signedFiles As New Collection
     Dim http As Object
@@ -30,55 +42,80 @@ Public Function CallSignatureAPI(pdfFiles As Collection) As Collection
     Dim fileBytes() As Byte
     Dim pdfsBase64 As String
 
+    Debug.Print "1. CrÃ©ation objet HTTP..."
     Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
-    ' apiUrl = "http://localhost:3000/api/process-pdfs-from-outlook"
-    apiUrl = "https://pdf-signature-api-60nw.onrender.com/api/process-pdfs-from-outlook"
+    apiUrl = API_BASE_URL & API_ENDPOINT
+    Debug.Print "? URL API: " & apiUrl
+    DoEvents
 
-    
-
-    ' Construire le JSON base64
+    Debug.Print "2. Construction JSON base64..."
     pdfsBase64 = "["
     For i = 1 To pdfFiles.count
+        Debug.Print "Traitement fichier " & i & "/" & pdfFiles.count
         pdfFile = pdfFiles.Item(i)
         fileName = pdfFile(0)
         filePath = pdfFile(1)
+        Debug.Print "Fichier: " & fileName & " - Chemin: " & filePath
+        
         fileBytes = ReadFileBytes(filePath)
+        Debug.Print "Taille fichier: " & UBound(fileBytes) + 1 & " bytes"
+        
         If i > 1 Then pdfsBase64 = pdfsBase64 & ","
         pdfsBase64 = pdfsBase64 & "{""filename"":""" & fileName & """,""content"":""" & EncodeBase64(fileBytes) & """}"
+        
+        DoEvents ' ? CRUCIAL aprÃ¨s chaque fichier
     Next i
     pdfsBase64 = pdfsBase64 & "]"
+    Debug.Print "? JSON construit. Taille: " & Len(pdfsBase64) & " caractÃ¨res"
+    DoEvents
 
+    Debug.Print "3. POINT CRITIQUE - Avant appel HTTP..."
+    Debug.Print "Heure avant HTTP: " & Now
+    DoEvents
+    
     http.Open "POST", apiUrl, False
     http.setRequestHeader "Content-Type", "application/json"
+    
+    Debug.Print "4. POINT CRITIQUE - Envoi donnÃ©es..."
     http.Send "{""pdfs_base64"":""" & EscapeJSONString(pdfsBase64) & """}"
-
+    
+    Debug.Print "? Envoi terminÃ©. Heure: " & Now
     Debug.Print "HTTP Status: " & http.status
-    Debug.Print "Response: " & http.responseText
+    Debug.Print "Response: " & Left(http.responseText, 200) & "..."
+    DoEvents
 
     If http.status = 200 Then
+        Debug.Print "5. Traitement rÃ©ponse..."
         Dim responseText As String
         responseText = http.responseText
         Dim jsonResponse As Object
         Set jsonResponse = ParseJSONResponse(responseText)
         If jsonResponse("success") = True Then
             Set CallSignatureAPI = ProcessSignedFilesResponse(jsonResponse("processedFiles"))
+            Debug.Print "? API Success. Fichiers retournÃ©s: " & CallSignatureAPI.count
         Else
+            Debug.Print "ERREUR API: " & jsonResponse("error")
             MsgBox "? Erreur API: " & jsonResponse("error"), vbCritical
             Set CallSignatureAPI = New Collection
         End If
     Else
+        Debug.Print "ERREUR HTTP: " & http.status & " - " & http.StatusText
         MsgBox "? Erreur HTTP " & http.status & ": " & http.StatusText, vbCritical
         Set CallSignatureAPI = New Collection
     End If
+    
+    Debug.Print "=== FIN CallSignatureAPI ==="
     Exit Function
 
 ErrorHandler:
+    Debug.Print "?? ERREUR CallSignatureAPI: " & Err.Description
+    Debug.Print "?? NumÃ©ro: " & Err.Number
     MsgBox "? Erreur communication API: " & Err.Description, vbCritical
     Set CallSignatureAPI = New Collection
 End Function
 
 ' ========================================
-' FONCTION UTILITAIRE POUR Ã‰CHAPPER LE JSON
+' FONCTION UTILITAIRE POUR Ãƒâ€°CHAPPER LE JSON
 ' ========================================
 Private Function EscapeJSONString(str As String) As String
     Dim s As String
@@ -137,7 +174,7 @@ Private Function BuildMultipartFormData(pdfFiles As Collection, boundary As Stri
         formData = formData & "Content-Transfer-Encoding: base64" & vbCrLf & vbCrLf
         formData = formData & fileContent & vbCrLf
         
-        Application.StatusBar = "?? PrÃ©paration: " & fileName & " (" & i & "/" & pdfFiles.count & ")"
+        Application.StatusBar = "?? PrÃƒÂ©paration: " & fileName & " (" & i & "/" & pdfFiles.count & ")"
     Next i
     
     ' Fermer le multipart
@@ -163,7 +200,7 @@ Private Function ReadFileAsBase64(filePath As String) As String
     Get #fileNum, , fileContent
     Close #fileNum
     
-    ' Convertir en Base64 (fonction simplifiÃ©e)
+    ' Convertir en Base64 (fonction simplifiÃƒÂ©e)
     base64String = EncodeBase64(fileContent)
     
     ReadFileAsBase64 = base64String
@@ -178,7 +215,7 @@ End Function
 ' ENCODER EN BASE64 (VERSION SIMPLIFIEE)
 ' ========================================
 Private Function EncodeBase64(data() As Byte) As String
-    ' Version simplifiÃ©e - dans la vraie implÃ©mentation,
+    ' Version simplifiÃƒÂ©e - dans la vraie implÃƒÂ©mentation,
     ' utiliser MSXML2.DOMDocument ou WinHTTP pour l'encodage Base64
     
     Dim xmlDoc As Object
@@ -223,7 +260,7 @@ Private Function ProcessSignedFilesResponse(processedFiles As Variant) As Collec
 
     On Error GoTo ErrorHandler
 
-    ' GÃ©rer Array ou Collection
+    ' GÃƒÂ©rer Array ou Collection
     If IsArray(processedFiles) Then
         For i = LBound(processedFiles) To UBound(processedFiles)
             Debug.Print "Traitement fichier #" & i
@@ -233,12 +270,12 @@ Private Function ProcessSignedFilesResponse(processedFiles As Variant) As Collec
                 If fileData.Exists("downloadUrl") Then
                     Debug.Print "Appel DownloadSignedFile pour: " & fileData("original")
                     localPath = DownloadSignedFile(downloadUrl, fileData("original"))
-                    Debug.Print "RÃ©sultat DownloadSignedFile: " & localPath
+                    Debug.Print "RÃƒÂ©sultat DownloadSignedFile: " & localPath
                     If localPath <> "" And Dir(localPath) <> "" And fileLen(localPath) > 0 Then
-                        Debug.Print "? Ajout Ã  la collection: " & localPath
+                        Debug.Print "? Ajout ÃƒÂ  la collection: " & localPath
                         signedFiles.Add Array(fileData("original"), localPath, fileData("coordinates"))
                     Else
-                        Debug.Print "? Fichier non valide pour ajout Ã  la collection: " & localPath
+                        Debug.Print "? Fichier non valide pour ajout ÃƒÂ  la collection: " & localPath
                     End If
                 End If
                 On Error GoTo 0
@@ -249,29 +286,30 @@ Private Function ProcessSignedFilesResponse(processedFiles As Variant) As Collec
             Set fileData = processedFiles.Item(i)
             If Not fileData Is Nothing Then
                 If fileData.Exists("downloadUrl") Then
-                    downloadUrl = "https://pdf-signature-api-60nw.onrender.com" & fileData("downloadUrl")
+                    'downloadUrl = "http://localhost:3000" & fileData("downloadUrl")
+                    downloadUrl = API_BASE_URL & fileData("downloadUrl")
                     localPath = DownloadSignedFile(downloadUrl, fileData("original"))
                     If localPath <> "" And Dir(localPath) <> "" And fileLen(localPath) > 0 Then
-                        Debug.Print "? Ajout Ã  la collection: " & localPath
+                        Debug.Print "? Ajout ÃƒÂ  la collection: " & localPath
                         signedFiles.Add Array(fileData("original"), localPath, fileData("coordinates"))
                     Else
-                        Debug.Print "? Fichier non valide pour ajout Ã  la collection: " & localPath
+                        Debug.Print "? Fichier non valide pour ajout ÃƒÂ  la collection: " & localPath
                     End If
                 ElseIf fileData.Exists("signed") Then
                     Dim signedFileName As String
                     signedFileName = Mid(fileData("signed"), InStrRev(fileData("signed"), "/") + 1)
                     localPath = "C:\Temp\PDFSignature\signed_" & signedFileName
                     If Dir(localPath) <> "" Then
-                        Debug.Print "? Fichier trouvÃ© pour ajout Ã  la collection: " & localPath
+                        Debug.Print "? Fichier trouvÃƒÂ© pour ajout ÃƒÂ  la collection: " & localPath
                         signedFiles.Add Array(fileData("original"), localPath, fileData("coordinates"))
                     Else
-                        Debug.Print "? Fichier non trouvÃ© pour ajout Ã  la collection: " & localPath
+                        Debug.Print "? Fichier non trouvÃƒÂ© pour ajout ÃƒÂ  la collection: " & localPath
                     End If
                 End If
             End If
         Next i
     End If
-    Debug.Print "Nb fichiers signÃ©s ajoutÃ©s: " & signedFiles.count
+    Debug.Print "Nb fichiers signÃƒÂ©s ajoutÃƒÂ©s: " & signedFiles.count
     Set ProcessSignedFilesResponse = signedFiles
     Exit Function
 
@@ -280,7 +318,7 @@ ErrorHandler:
 End Function
 
 ' ========================================
-' TELECHARGER UN FICHIER SIGNE (VERSION CORRIGÃ‰E FINALE)
+' TELECHARGER UN FICHIER SIGNE (VERSION CORRIGÃƒâ€°E FINALE)
 ' ========================================
 Private Function DownloadSignedFile(downloadUrl As String, fileName As String) As String
     On Error GoTo ErrorHandler
@@ -289,51 +327,52 @@ Private Function DownloadSignedFile(downloadUrl As String, fileName As String) A
     Dim localPath As String
     Dim fileNum As Integer
     
-    ' CrÃ©er l'objet HTTP
+    ' CrÃƒÂ©er l'objet HTTP
     Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
     
-    ' Construire l'URL complÃ¨te si nÃ©cessaire
+    ' Construire l'URL complÃƒÂ¨te si nÃƒÂ©cessaire
     Dim fullUrl As String
     If Left(downloadUrl, 4) = "http" Then
         fullUrl = downloadUrl
     Else
-        fullUrl = "https://pdf-signature-api-60nw.onrender.com" & downloadUrl
+        'fullUrl = "http://localhost:3000" & downloadUrl
+        fullUrl = API_BASE_URL & downloadUrl
     End If
     
-    Debug.Print "TÃ©lÃ©chargement depuis: " & fullUrl
+    Debug.Print "TÃƒÂ©lÃƒÂ©chargement depuis: " & fullUrl
     
-    ' Faire la requÃªte HTTP
+    ' Faire la requÃƒÂªte HTTP
     http.Open "GET", fullUrl, False
     http.setRequestHeader "Accept", "application/pdf"
     http.Send
     
-    Debug.Print "HTTP Status tÃ©lÃ©chargement: " & http.status
+    Debug.Print "HTTP Status tÃƒÂ©lÃƒÂ©chargement: " & http.status
     
     If http.status = 200 Then
-        ' DÃ©finir le chemin local
+        ' DÃƒÂ©finir le chemin local
         localPath = "C:\Temp\PDFSignature\signed_" & fileName
         
-        ' CrÃ©er le dossier s'il n'existe pas
+        ' CrÃƒÂ©er le dossier s'il n'existe pas
         If Dir("C:\Temp\PDFSignature", vbDirectory) = "" Then
             MkDir "C:\Temp\PDFSignature"
         End If
         
-        ' Ã‰crire le fichier en mode binaire
+        ' Ãƒâ€°crire le fichier en mode binaire
         fileNum = FreeFile
         Open localPath For Binary As #fileNum
         Put #fileNum, 1, http.responseBody
         Close #fileNum
         
-        ' VÃ©rifier que le fichier a Ã©tÃ© crÃ©Ã©
+        ' VÃƒÂ©rifier que le fichier a ÃƒÂ©tÃƒÂ© crÃƒÂ©ÃƒÂ©
         If Dir(localPath) <> "" And fileLen(localPath) > 0 Then
-            Debug.Print "? Fichier tÃ©lÃ©chargÃ©: " & localPath & " - Taille: " & fileLen(localPath)
+            Debug.Print "? Fichier tÃƒÂ©lÃƒÂ©chargÃƒÂ©: " & localPath & " - Taille: " & fileLen(localPath)
             DownloadSignedFile = localPath
         Else
-            Debug.Print "? Fichier non crÃ©Ã© aprÃ¨s tÃ©lÃ©chargement: " & localPath
+            Debug.Print "? Fichier non crÃƒÂ©ÃƒÂ© aprÃƒÂ¨s tÃƒÂ©lÃƒÂ©chargement: " & localPath
             DownloadSignedFile = ""
         End If
     Else
-        Debug.Print "? Erreur HTTP tÃ©lÃ©chargement: " & http.status & " - " & fullUrl
+        Debug.Print "? Erreur HTTP tÃƒÂ©lÃƒÂ©chargement: " & http.status & " - " & fullUrl
         DownloadSignedFile = ""
     End If
     
@@ -355,17 +394,18 @@ Public Function TestAPIConnection() As Boolean
     Dim testUrl As String
     
     Set xmlHttp = CreateObject("MSXML2.XMLHTTP.6.0")
-    testUrl = "https://pdf-signature-api-60nw.onrender.com/"
+    ' testUrl = "http://localhost:3000/"
+    testUrl = API_BASE_URL & "/"
     
     xmlHttp.Open "GET", testUrl, False
     xmlHttp.Send
     
     If xmlHttp.status = 200 Then
         TestAPIConnection = True
-        MsgBox "? Connexion API rÃ©ussie !" & vbCrLf & "Status: " & xmlHttp.status, vbInformation
+        MsgBox "? Connexion API rÃƒÂ©ussie !" & vbCrLf & "Status: " & xmlHttp.status, vbInformation
     Else
         TestAPIConnection = False
-        MsgBox "? Ã‰chec connexion API" & vbCrLf & "Status: " & xmlHttp.status, vbCritical
+        MsgBox "? Ãƒâ€°chec connexion API" & vbCrLf & "Status: " & xmlHttp.status, vbCritical
     End If
     
     Exit Function
@@ -373,7 +413,7 @@ Public Function TestAPIConnection() As Boolean
 ErrorHandler:
     TestAPIConnection = False
     MsgBox "? Erreur test API: " & Err.Description & vbCrLf & vbCrLf & _
-           "VÃ©rifiez que l'API fonctionne sur https://pdf-signature-api-60nw.onrender.com", vbCritical
+           "VÃƒÂ©rifiez que l'API fonctionne sur https://pdf-signature-api-60nw.onrender.com", vbCritical
 End Function
 
 Private Function ToBytes(v As Variant) As Byte()
@@ -383,5 +423,8 @@ Private Function ToBytes(v As Variant) As Byte()
         ReDim ToBytes(0)
     End If
 End Function
+
+
+
 
 

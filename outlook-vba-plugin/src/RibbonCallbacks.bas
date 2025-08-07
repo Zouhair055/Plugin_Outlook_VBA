@@ -1,9 +1,9 @@
 ' ========================================
-' Ribbon UI - Interface utilisateur personnalisÃ©e
+' Ribbon UI - Interface utilisateur personnalisÃƒÂ©e
 ' ========================================
 '
 ' Description: Configuration du ruban Outlook pour ajouter le bouton "Signer PDFs"
-' Fonctions: Callback ribbon, Custom UI XML, Gestion d'Ã©vÃ©nements
+' Fonctions: Callback ribbon, Custom UI XML, Gestion d'ÃƒÂ©vÃƒÂ©nements
 '
 ' ========================================
 
@@ -17,7 +17,7 @@ Public MyRibbon As IRibbonUI
 ' ========================================
 Public Sub OnRibbonLoad(ribbon As IRibbonUI)
     Set MyRibbon = ribbon
-    Debug.Print "ðŸ“Œ Ruban PDF Signature Assistant chargÃ©"
+    Debug.Print "Ã°Å¸â€œÅ’ Ruban PDF Signature Assistant chargÃƒÂ©"
 End Sub
 
 ' ========================================
@@ -32,7 +32,7 @@ End Sub
 ' CALLBACK POUR LE BOUTON TEST API
 ' ========================================
 Public Sub OnTestAPI(control As IRibbonControl)
-    ' Tester la connexion Ã  l'API
+    ' Tester la connexion ÃƒÂ  l'API
     Dim result As Boolean
     result = TestAPIConnection()
 End Sub
@@ -41,8 +41,8 @@ End Sub
 ' CALLBACK POUR L'ICONE DU BOUTON
 ' ========================================
 Public Sub GetButtonImage(control As IRibbonControl, ByRef image)
-    ' Retourner l'icÃ´ne pour le bouton (optionnel)
-    ' Dans ce cas, utilise l'icÃ´ne par dÃ©faut d'Outlook
+    ' Retourner l'icÃƒÂ´ne pour le bouton (optionnel)
+    ' Dans ce cas, utilise l'icÃƒÂ´ne par dÃƒÂ©faut d'Outlook
 End Sub
 
 ' ========================================
@@ -79,10 +79,10 @@ End Sub
 Public Sub GetButtonSupertip(control As IRibbonControl, ByRef supertip)
     Select Case control.ID
         Case "btnSignPDFs"
-            supertip = "Analyse et signe automatiquement tous les PDFs joints Ã  cet email, " & _
-                      "puis prÃ©pare une rÃ©ponse avec les documents signÃ©s."
+            supertip = "Analyse et signe automatiquement tous les PDFs joints ÃƒÂ  cet email, " & _
+                      "puis prÃƒÂ©pare une rÃƒÂ©ponse avec les documents signÃƒÂ©s."
         Case "btnTestAPI"
-            supertip = "VÃ©rifie que l'API de signature fonctionne correctement sur localhost:3000"
+            supertip = "VÃƒÂ©rifie que l'API de signature fonctionne correctement sur localhost:3000"
         Case Else
             supertip = "Assistant automatique pour la signature de documents PDF"
     End Select
@@ -137,9 +137,9 @@ End Sub
 ' CALLBACK POUR LES ERREURS DE RUBAN
 ' ========================================
 Public Sub OnRibbonError(ribbon As IRibbonUI, control As IRibbonControl, ByVal fInvalidateControl As Boolean, ByVal strError As String)
-    Debug.Print "âŒ Erreur Ruban: " & strError & " (Control: " & control.ID & ")"
+    Debug.Print "Ã¢ÂÅ’ Erreur Ruban: " & strError & " (Control: " & control.ID & ")"
     
-    ' Log l'erreur pour dÃ©bogage
+    ' Log l'erreur pour dÃƒÂ©bogage
     Dim logFile As String
     logFile = Environ("TEMP") & "\PDFSignatureRibbonError.log"
     

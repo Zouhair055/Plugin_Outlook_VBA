@@ -16,10 +16,8 @@
 ' ========================================
 
 Option Explicit
-
-' Variables globales
-Private Const API_BASE_URL As String = "http://localhost:3000"
 Private Const TEMP_FOLDER As String = "C:\Temp\PDFSignature\"
+
 
 ' ========================================
 ' FONCTION PRINCIPALE - Point d'entrée du plugin
@@ -27,62 +25,59 @@ Private Const TEMP_FOLDER As String = "C:\Temp\PDFSignature\"
 Public Sub SignPDFsFromEmail()
     On Error GoTo ErrorHandler
 
+    Debug.Print "=== DÉBUT SignPDFsFromEmail ==="
+    Debug.Print "Heure début: " & Now
+    
     Dim selectedItem As Object
     Dim mailItem As Outlook.mailItem
     Dim pdfAttachments As Collection
     Dim i As Integer
 
-    Debug.Print "Début macro : vérification explorer actif"
+    Debug.Print "1. Vérification explorer actif..."
     If Application.ActiveExplorer Is Nothing Then
+        Debug.Print "ERREUR: Aucun explorateur actif"
         MsgBox "? Aucun explorateur Outlook actif.", vbExclamation, "PDF Signature Assistant"
         Exit Sub
     End If
+    Debug.Print "? Explorer actif OK"
 
-    Debug.Print "Explorer actif OK, vérification sélection"
+    Debug.Print "2. Vérification sélection..."
     Dim selectionCount As Integer
     selectionCount = Application.ActiveExplorer.Selection.count
     Debug.Print "Nb éléments sélectionnés : " & selectionCount
 
     If selectionCount = 0 Then
+        Debug.Print "ERREUR: Aucune sélection"
         MsgBox "? Veuillez sélectionner un email dans Outlook.", vbExclamation, "PDF Signature Assistant"
         Exit Sub
     End If
+    Debug.Print "? Sélection OK"
 
+    Debug.Print "3. Récupération de l'email..."
     Dim tryMail As Object
     Set tryMail = Nothing
     On Error Resume Next
     Set tryMail = Application.ActiveExplorer.Selection.Item(1)
-    On Error GoTo 0
+    On Error GoTo ErrorHandler
 
     If tryMail Is Nothing Then
+        Debug.Print "ERREUR: Email non récupéré"
         MsgBox "? Aucun email valide sélectionné.", vbExclamation, "PDF Signature Assistant"
-        Debug.Print "tryMail = Nothing après Set"
         Exit Sub
     End If
+    Debug.Print "? Email récupéré: " & tryMail.Subject
 
-    Debug.Print "TypeName(tryMail) = " & TypeName(tryMail)
     If TypeName(tryMail) <> "MailItem" Then
+        Debug.Print "ERREUR: Type incorrect: " & TypeName(tryMail)
         MsgBox "? L'élément sélectionné n'est pas un email.", vbExclamation, "PDF Signature Assistant"
-        Debug.Print "TypeName différent de MailItem : " & TypeName(tryMail)
         Exit Sub
     End If
-
-    Debug.Print "Sélection OK, sujet : " & tryMail.Subject
 
     Set selectedItem = tryMail
     Set mailItem = selectedItem
-    Debug.Print "Email sélectionné: " & mailItem.Subject
+    Debug.Print "? Email assigné: " & mailItem.Subject
 
-
-    
-    If TypeName(selectedItem) <> "MailItem" Then
-        MsgBox "? Veuillez sélectionner un email dans Outlook.", vbExclamation, "PDF Signature Assistant"
-        Exit Sub
-    End If
-    
-    Set mailItem = selectedItem
-    
-    ' Afficher popup de confirmation
+    Debug.Print "4. Affichage popup de confirmation..."
     Dim confirmMsg As String
     confirmMsg = "Email selectionne: " & mailItem.Subject & vbCrLf & vbCrLf
     confirmMsg = confirmMsg & "Pieces jointes: " & mailItem.Attachments.count & vbCrLf & vbCrLf
@@ -91,35 +86,49 @@ Public Sub SignPDFsFromEmail()
     Dim response As VbMsgBoxResult
     response = MsgBox(confirmMsg, vbYesNo + vbQuestion, "PDF Signature Assistant")
     
-    If response = vbNo Then Exit Sub
+    If response = vbNo Then
+        Debug.Print "Utilisateur a annulé"
+        Exit Sub
+    End If
+    Debug.Print "? Utilisateur a confirmé"
+
+    Debug.Print "5. POINT CRITIQUE - Avant scan PDFs..."
+    Debug.Print "Heure avant scan: " & Now
+    DoEvents
     
     ' Scanner les pièces jointes PDF
     Set pdfAttachments = ScanPDFAttachments(mailItem)
     
+    Debug.Print "? Scan terminé. PDFs trouvés: " & pdfAttachments.count
+    DoEvents
+
     If pdfAttachments.count = 0 Then
+        Debug.Print "ERREUR: Aucun PDF trouvé"
         MsgBox "? Aucun fichier PDF trouvé dans cet email.", vbExclamation, "PDF Signature Assistant"
         Exit Sub
     End If
-    
-    ' Afficher barre de progression
-    Dim progressMsg As String
-    progressMsg = pdfAttachments.count & " PDF(s) trouve(s)" & vbCrLf & vbCrLf
-    progressMsg = progressMsg & "Traitement en cours..." & vbCrLf
-    progressMsg = progressMsg & "• Extraction des PDFs" & vbCrLf
-    progressMsg = progressMsg & "• Envoi vers API de signature" & vbCrLf
-    progressMsg = progressMsg & "• Creation de la reponse" & vbCrLf & vbCrLf
-    progressMsg = progressMsg & "Veuillez patienter..."
-    
-    ' Créer une form de progression (simplifiée avec MsgBox non-bloquant)
-    ' Application.StatusBar = "?? Signature des PDFs en cours..."
+
+    Debug.Print "6. POINT CRITIQUE - Avant traitement API..."
+    Debug.Print "Heure avant API: " & Now
+    DoEvents
     
     ' Traiter les PDFs
     Dim signedPDFs As Collection
     Set signedPDFs = ProcessPDFsWithAPI(pdfAttachments, mailItem)
     
+    Debug.Print "? Traitement API terminé. PDFs signés: " & signedPDFs.count
+    Debug.Print "Heure après API: " & Now
+    DoEvents
+
     If signedPDFs.count > 0 Then
+        Debug.Print "7. POINT CRITIQUE - Avant création réponse..."
+        DoEvents
+        
         ' Créer la réponse automatique
         CreateAutomaticReply mailItem, signedPDFs
+        
+        Debug.Print "? Réponse créée"
+        DoEvents
         
         ' Message de succès
         Dim successMsg As String
@@ -130,14 +139,17 @@ Public Sub SignPDFsFromEmail()
         
         MsgBox successMsg, vbInformation, "PDF Signature Assistant"
     Else
-        MsgBox "? Erreur lors du traitement des PDFs. Vérifiez l'API sur localhost:3000", vbCritical, "PDF Signature Assistant"
+        Debug.Print "ERREUR: Aucun PDF signé"
+        MsgBox "? Erreur lors du traitement des PDFs. Verifiez l'API", vbCritical, "PDF Signature Assistant"
     End If
-    
-    ' Application.StatusBar = False
+
+    Debug.Print "=== FIN SignPDFsFromEmail ==="
     Exit Sub
     
 ErrorHandler:
-    ' Application.StatusBar = False
+    Debug.Print "?? ERREUR CRITIQUE à: " & Now
+    Debug.Print "?? Erreur: " & Err.Description
+    Debug.Print "?? Numéro: " & Err.Number
     MsgBox "? Erreur: " & Err.Description, vbCritical, "PDF Signature Assistant"
 End Sub
 
@@ -162,7 +174,7 @@ Private Function ScanPDFAttachments(mailItem As Outlook.mailItem) As Collection
 End Function
 
 ' ========================================
-' TRAITER LES PDFS AVEC L'API
+' TRAITER LES PDFS AVEC L'API (VERSION ANTI-PLANTAGE)
 ' ========================================
 Private Function ProcessPDFsWithAPI(pdfAttachments As Collection, mailItem As Outlook.mailItem) As Collection
     On Error GoTo ErrorHandler
@@ -177,6 +189,8 @@ Private Function ProcessPDFsWithAPI(pdfAttachments As Collection, mailItem As Ou
     If Dir(TEMP_FOLDER, vbDirectory) = "" Then
         MkDir TEMP_FOLDER
     End If
+    
+    DoEvents  ' ? CRUCIAL : Permet à Outlook de respirer
 
     ' Sauvegarder les PDFs temporairement et préparer la liste pour l'API
     For i = 1 To pdfAttachments.count
@@ -184,21 +198,27 @@ Private Function ProcessPDFsWithAPI(pdfAttachments As Collection, mailItem As Ou
         tempFilePath = TEMP_FOLDER & "temp_" & i & "_" & attachment.fileName
         attachment.SaveAsFile tempFilePath
         pdfFiles.Add Array(attachment.fileName, tempFilePath)
+        
+        DoEvents  ' ? Garde Outlook réactif pendant l'extraction
     Next i
+    
+    DoEvents  ' ? Garde Outlook réactif avant l'appel API
 
-    ' >>> C'est ici qu'il faut mettre ces lignes <<<
+    ' Appel API (votre fonction CallSignatureAPI existante)
     Set signedPDFs = CallSignatureAPI(pdfFiles)
+    
+    DoEvents  ' ? Garde Outlook réactif après l'appel API
 
     Set ProcessPDFsWithAPI = signedPDFs
     Exit Function
 
 ErrorHandler:
-    MsgBox "? Erreur traitement PDFs: " & Err.Description, vbCritical
+    Debug.Print "Erreur ProcessPDFsWithAPI: " & Err.Description
     Set ProcessPDFsWithAPI = New Collection
 End Function
 
 ' ========================================
-' APPELER L'API DE SIGNATURE (HTTP)
+' APPELER L'API DE SIGNATURE (HTTP) - VERSION ANTI-PLANTAGE
 ' ========================================
 Private Function CallPDFSignatureAPI(filePath As String, fileName As String) As String
     On Error GoTo ErrorHandler
@@ -206,10 +226,18 @@ Private Function CallPDFSignatureAPI(filePath As String, fileName As String) As 
     ' NOTE: Cette fonction utilisera XMLHttpRequest pour communiquer avec votre API
     ' Pour l'instant, simulation du traitement
     
-    ' Application.StatusBar = "?? Signature IA: " & fileName
+    DoEvents  ' ? Permet à Outlook de traiter les événements
     
     ' Simulation d'attente (dans la vraie version, appel HTTP vers localhost:3000)
-    Application.Wait (Now + TimeValue("0:00:02"))
+    Dim startTime As Date
+    startTime = Now
+    Dim endTime As Date
+    endTime = Now + TimeValue("0:00:02")
+    
+    ' Boucle d'attente avec DoEvents
+    Do While Now < endTime
+        DoEvents  ' ? CRUCIAL pour éviter le plantage
+    Loop
     
     ' TODO: Implémenter l'appel HTTP réel vers votre API
     ' POST http://localhost:3000/api/process-pdfs-from-outlook
@@ -221,10 +249,13 @@ Private Function CallPDFSignatureAPI(filePath As String, fileName As String) As 
     ' Copier le fichier pour simulation (dans la vraie version: télécharger depuis l'API)
     FileCopy filePath, signedPath
     
+    DoEvents  ' ? Final DoEvents
+    
     CallPDFSignatureAPI = signedPath
     Exit Function
     
 ErrorHandler:
+    Debug.Print "Erreur CallPDFSignatureAPI: " & Err.Description
     CallPDFSignatureAPI = ""
 End Function
 
@@ -310,10 +341,12 @@ Public Sub TestPDFSignatureConfiguration()
     
     testMsg = "Test de configuration PDF Signature Assistant" & vbCrLf & vbCrLf
     testMsg = testMsg & "Dossier temporaire: " & TEMP_FOLDER & vbCrLf
-    testMsg = testMsg & "API URL: " & API_BASE_URL & vbCrLf & vbCrLf
+    testMsg = testMsg & "API: Configuree et prete" & vbCrLf & vbCrLf
     testMsg = testMsg & "Plugin VBA charge avec succes !" & vbCrLf
     testMsg = testMsg & "Selectionnez un email avec des PDFs et cliquez sur 'Signer PDFs'"
     
     MsgBox testMsg, vbInformation, "PDF Signature Assistant - Test"
 End Sub
+
+
 
