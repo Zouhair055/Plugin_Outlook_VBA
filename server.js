@@ -308,8 +308,8 @@ if (!fs.existsSync('uploads/signed')) {
   fs.mkdirSync('uploads/signed', { recursive: true });
 }
 
-// Démarrer le serveur
-app.listen(PORT, () => {
+// Démarrer le serveur (VERSION CORRIGÉE POUR RENDER)
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 API Signature PDF démarrée sur http://localhost:${PORT}`);
   console.log('📧 Spécialement conçue pour Add-in Outlook');
   console.log('🖼️ Image de signature:', signatureImageBytes ? '✅ Chargée' : '❌ Non trouvée');
@@ -323,4 +323,7 @@ app.listen(PORT, () => {
   console.log('🔗 Endpoints disponibles:');
   console.log('   POST /api/process-pdfs-from-outlook - Traitement complet PDFs');
   console.log('   GET  /download-signed/:filename - Téléchargement PDFs signés');
+  
+  // Signal pour Render que le service est prêt
+  console.log(`🌐 Service accessible sur toutes les interfaces (0.0.0.0:${PORT})`);
 });
