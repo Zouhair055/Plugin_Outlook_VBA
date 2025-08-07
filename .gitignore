@@ -1,0 +1,12 @@
+# Variables d'environnement
+.env
+
+# Dossiers temporaires
+uploads/
+node_modules/
+
+# Logs
+*.log
+
+pdf-signature-outlook-addin/
+RAPPORT DE STAGE.pdf/

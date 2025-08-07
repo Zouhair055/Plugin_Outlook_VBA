@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui">
+  <ribbon>
+    <tabs>
+      <tab idMso="TabMail">
+        <group id="grpPDFSignature" label="PDF Signature" insertAfterMso="GroupRespond">
+          <button id="btnSignPDFs"
+                  label="Signer PDFs"
+                  size="large" 
+                  imageMso="PictureInsertFromFile"
+                  onAction="SignPDFsFromEmail"
+                  getEnabled="GetButtonEnabled" />
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>
