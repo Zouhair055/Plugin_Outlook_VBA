@@ -41,12 +41,9 @@ try {
 // Endpoint de base pour vérifier que l'API fonctionne
 app.get('/', (req, res) => {
   res.json({
-    message: '🚀 API Signature PDF pour Add-in Outlook',
-    status: 'running',
-    endpoints: [
-      'POST /api/process-pdfs-from-outlook - Traitement complet depuis Outlook',
-      'GET /download-signed/:filename - Téléchargement PDFs signés'
-    ]
+    message: 'PDF Signature API',
+    status: 'online',
+    timestamp: new Date().toISOString()
   });
 });
 

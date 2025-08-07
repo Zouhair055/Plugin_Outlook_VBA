@@ -19,18 +19,18 @@ Public Sub InstallPDFSignaturePlugin()
     startTime = Now
     
     ' Afficher le dialogue de dÃ©but
-    If MsgBox("ðŸš€ Installation du Plugin PDF Signature Assistant" & vbCrLf & vbCrLf & _
-              "Cette installation va:" & vbCrLf & _
-              "â€¢ Configurer le ruban Outlook" & vbCrLf & _
-              "â€¢ Enregistrer les callbacks VBA" & vbCrLf & _
-              "â€¢ Tester la connexion API" & vbCrLf & _
-              "â€¢ CrÃ©er les dossiers nÃ©cessaires" & vbCrLf & vbCrLf & _
-              "Continuer l'installation ?", vbYesNo + vbQuestion, "Installation Plugin") = vbNo Then
+    If MsgBox("Installation du Plugin PDF Signature Assistant" & vbCrLf & vbCrLf & _
+            "Cette installation va:" & vbCrLf & _
+            "• Configurer le ruban Outlook" & vbCrLf & _
+            "• Enregistrer les callbacks VBA" & vbCrLf & _
+            "• Tester la connexion API" & vbCrLf & _
+            "• Creer les dossiers necessaires" & vbCrLf & vbCrLf & _
+            "Continuer l'installation ?", vbYesNo + vbQuestion, "Installation Plugin") = vbNo Then
         Exit Sub
     End If
-    
-    ' Ã‰tapes d'installation
-    ' Application.StatusBar = "ðŸ”§ Installation en cours..."
+
+    ' Étapes d'installation
+    ' Application.StatusBar = "🔧 Installation en cours..."
     
     ' 1. CrÃ©er les dossiers systÃ¨me
     CreateSystemFolders
