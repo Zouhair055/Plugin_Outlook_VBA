@@ -14,9 +14,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS pour Add-in Outlook
+// CORS: n'autoriser que l'add-in
+const allowedOrigins = new Set(['http://localhost:3001', 'https://localhost:3001']);
 app.use(cors({
-  origin: ['http://localhost:3001', 'https://localhost:3001', '*'],
+  origin: (origin, cb) => (!origin || allowedOrigins.has(origin)) ? cb(null, true) : cb(new Error('Not allowed by CORS')),
   credentials: true
 }));
 
@@ -47,36 +48,42 @@ app.get('/', (req, res) => {
   });
 });
 
-// Fonction pour appeler Groq API
+// Fonction pour appeler Groq API (avec timeout + erreurs gérées)
 async function callGroqAPI(message) {
   if (!GROQ_API_KEY) {
     throw new Error('GROQ_API_KEY non configurée dans le fichier .env');
   }
-
   console.log('🤖 Appel vers Groq API...');
-  
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GROQ_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: 'llama3-70b-8192',
-      messages: [{ role: 'user', content: message }],
-      temperature: 0.7,
-      max_tokens: 2000
-    })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`❌ Erreur Groq API ${response.status}:`, errorText);
-    throw new Error(`Erreur Groq API: ${response.status}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000); // 10s
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'llama3-70b-8192',
+        messages: [{ role: 'user', content: message }],
+        temperature: 0.4,
+        max_tokens: 400
+      }),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Erreur Groq API ${response.status}:`, errorText);
+      throw new Error(`Erreur Groq API: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content ?? '';
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Groq timeout');
+    throw err;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
 }
 
 // ENDPOINT PRINCIPAL pour l'Add-in Outlook : Traitement complet des PDFs
@@ -157,8 +164,13 @@ Règles de placement:
 Réponds SEULEMENT avec le JSON, rien d'autre.
 `;
 
-        const analysis = await callGroqAPI(analysisPrompt);
-        console.log(`✅ Analyse ${file.originalname}:`, analysis);
+        let analysis;
+        try {
+          analysis = await callGroqAPI(analysisPrompt);
+        } catch (e) {
+          console.warn(`⚠️ Analyse IA indisponible (${e.message}), fallback coord par défaut`);
+          analysis = '{"page":1,"x":400,"y":80,"confidence":"low","reasoning":"fallback"}';
+        }
 
         // Étape 2: Application de la signature
         const signedPdf = await applySignatureToPDF(file, analysis);
